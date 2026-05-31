@@ -1,25 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "./ui/Button";
 
-const LABELS = {
-  title: "Datei-Upload Transkription",
-  description:
-    "Wähle eine Audio-Datei aus (MP3, MP4, M4A, WAV, FLAC, OGG) und transkribiere sie nachträglich.",
-  chooseFile: "Datei auswählen",
-  transcribing: "Transkribiere...",
-  selectedFile: "Ausgewählte Datei",
-  progress: "Fortschritt",
-  resultTitle: "Transkriptionsergebnis",
-  copyResult: "Ergebnis kopieren",
-  copySuccess: "Transkription wurde in die Zwischenablage kopiert.",
-  copyError: "Kopieren in die Zwischenablage fehlgeschlagen.",
-  transcribeError: "Die Datei konnte nicht transkribiert werden.",
-} as const;
-
 export const FileUploadTab: React.FC = () => {
+  const { t } = useTranslation();
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
@@ -77,9 +64,11 @@ export const FileUploadTab: React.FC = () => {
       setProgress(100);
     } catch (invokeError) {
       const message =
-        invokeError instanceof Error
-          ? invokeError.message
-          : LABELS.transcribeError;
+        typeof invokeError === "string"
+          ? invokeError
+          : invokeError instanceof Error
+            ? invokeError.message
+            : t("fileUpload.transcribeError");
       setError(message);
       setProgress(0);
     } finally {
@@ -90,17 +79,17 @@ export const FileUploadTab: React.FC = () => {
   const handleCopyResult = async () => {
     try {
       await navigator.clipboard.writeText(result);
-      toast.success(LABELS.copySuccess);
+      toast.success(t("fileUpload.copySuccess"));
     } catch {
-      toast.error(LABELS.copyError);
+      toast.error(t("fileUpload.copyError"));
     }
   };
 
   return (
     <div className="max-w-3xl w-full mx-auto space-y-4">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">{LABELS.title}</h2>
-        <p className="text-sm text-mid-gray">{LABELS.description}</p>
+        <h2 className="text-lg font-semibold">{t("fileUpload.title")}</h2>
+        <p className="text-sm text-mid-gray">{t("fileUpload.description")}</p>
       </div>
 
       <Button
@@ -109,12 +98,14 @@ export const FileUploadTab: React.FC = () => {
         onClick={handleSelectFile}
         disabled={isTranscribing}
       >
-        {isTranscribing ? LABELS.transcribing : LABELS.chooseFile}
+        {isTranscribing
+          ? t("fileUpload.transcribing")
+          : t("fileUpload.chooseFile")}
       </Button>
 
       {selectedFileName && (
         <div className="text-sm text-mid-gray">
-          {LABELS.selectedFile}:{" "}
+          {t("fileUpload.selectedFile")}:{" "}
           <span className="text-foreground">{selectedFileName}</span>
         </div>
       )}
@@ -122,7 +113,7 @@ export const FileUploadTab: React.FC = () => {
       {isTranscribing && (
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-mid-gray">
-            <span>{LABELS.progress}</span>
+            <span>{t("fileUpload.progress")}</span>
             <span>{progress}%</span>
           </div>
           <div className="h-2 w-full rounded bg-mid-gray/20 overflow-hidden">
@@ -138,12 +129,14 @@ export const FileUploadTab: React.FC = () => {
 
       {result && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">{LABELS.resultTitle}</h3>
+          <h3 className="text-sm font-semibold">
+            {t("fileUpload.resultTitle")}
+          </h3>
           <div className="text-sm p-3 rounded border border-mid-gray/30 bg-mid-gray/10 whitespace-pre-wrap">
             {result}
           </div>
           <Button variant="secondary" size="sm" onClick={handleCopyResult}>
-            {LABELS.copyResult}
+            {t("fileUpload.copyResult")}
           </Button>
         </div>
       )}

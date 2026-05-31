@@ -18,6 +18,19 @@
     "debug": "Debug",
     "about": "Info"
   },
+  "fileUpload": {
+    "title": "Datei-Upload Transkription",
+    "description": "Wähle eine Audio-Datei (MP3, MP4, M4A, WAV, FLAC, OGG) und transkribiere sie nachträglich.",
+    "chooseFile": "Datei auswählen",
+    "transcribing": "Transkribiere...",
+    "selectedFile": "Ausgewählte Datei",
+    "progress": "Fortschritt",
+    "resultTitle": "Transkriptionsergebnis",
+    "copyResult": "Ergebnis kopieren",
+    "copySuccess": "Transkription wurde in die Zwischenablage kopiert.",
+    "copyError": "Kopieren in die Zwischenablage fehlgeschlagen.",
+    "transcribeError": "Die Datei konnte nicht transkribiert werden."
+  },
   "onboarding": {
     "subtitle": "Wähle ein Transkriptionsmodell, um loszulegen",
     "recommended": "Empfohlen",

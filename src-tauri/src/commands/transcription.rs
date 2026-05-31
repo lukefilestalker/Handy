@@ -65,13 +65,12 @@ pub async fn transcribe_file(
     let input_path = PathBuf::from(&file_path);
 
     if !input_path.is_file() {
-        return Err("Die ausgewählte Datei konnte nicht gefunden werden.".to_string());
+        return Err("Selected file could not be found.".to_string());
     }
 
     if !is_supported_audio_file(&input_path) {
         return Err(
-            "Nicht unterstütztes Audioformat. Erlaubt sind MP3, MP4, M4A, WAV, FLAC und OGG."
-                .to_string(),
+            "Unsupported audio format. Allowed formats: MP3, MP4, M4A, WAV, FLAC, OGG.".to_string(),
         );
     }
 
@@ -81,10 +80,10 @@ pub async fn transcribe_file(
     let decoded_samples =
         tauri::async_runtime::spawn_blocking(move || decode_audio_file_to_mono(&decode_path))
             .await
-            .map_err(|e| format!("Audio-Dekodierung fehlgeschlagen: {}", e))??;
+            .map_err(|e| format!("Audio decoding failed: {}", e))??;
 
     if decoded_samples.is_empty() {
-        return Err("Die ausgewählte Datei enthält keine Audio-Daten.".to_string());
+        return Err("Selected file does not contain audio samples.".to_string());
     }
 
     let samples_for_history = decoded_samples.clone();
@@ -92,22 +91,31 @@ pub async fn transcribe_file(
     let transcription =
         tauri::async_runtime::spawn_blocking(move || tm.transcribe(decoded_samples))
             .await
-            .map_err(|e| format!("Transkriptions-Task fehlgeschlagen: {}", e))?
-            .map_err(|e| format!("Transkription fehlgeschlagen: {}", e))?;
+            .map_err(|e| format!("Transcription task failed: {}", e))?
+            .map_err(|e| format!("Transcription failed: {}", e))?;
 
-    let file_name = format!("handy-upload-{}.wav", Utc::now().timestamp_millis());
+    let original_stem = input_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("audio");
+    let safe_stem = sanitize_file_stem(original_stem);
+    let file_name = format!(
+        "file-upload-{}-{}.wav",
+        safe_stem,
+        Utc::now().timestamp_millis()
+    );
     let wav_path = history_manager.recordings_dir().join(&file_name);
     let wav_path_for_save = wav_path.clone();
     tauri::async_runtime::spawn_blocking(move || {
         crate::audio_toolkit::save_wav_file(&wav_path_for_save, &samples_for_history)
     })
     .await
-    .map_err(|e| format!("Speichern der Audio-Datei fehlgeschlagen: {}", e))?
-    .map_err(|e| format!("Speichern der Audio-Datei fehlgeschlagen: {}", e))?;
+    .map_err(|e| format!("Saving decoded WAV failed: {}", e))?
+    .map_err(|e| format!("Saving decoded WAV failed: {}", e))?;
 
     history_manager
         .save_entry(file_name, transcription.clone(), false, None, None)
-        .map_err(|e| format!("Speichern des History-Eintrags fehlgeschlagen: {}", e))?;
+        .map_err(|e| format!("Saving history entry failed: {}", e))?;
 
     Ok(transcription)
 }
@@ -120,8 +128,8 @@ fn is_supported_audio_file(path: &Path) -> bool {
 }
 
 fn decode_audio_file_to_mono(path: &Path) -> Result<Vec<f32>, String> {
-    let file = std::fs::File::open(path)
-        .map_err(|e| format!("Datei konnte nicht geöffnet werden: {}", e))?;
+    let file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open audio file: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
@@ -136,20 +144,20 @@ fn decode_audio_file_to_mono(path: &Path) -> Result<Vec<f32>, String> {
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .map_err(|e| format!("Audioformat konnte nicht erkannt werden: {}", e))?;
+        .map_err(|e| format!("Failed to detect audio format: {}", e))?;
 
     let mut format = probed.format;
     let track = format
         .tracks()
         .iter()
         .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
-        .ok_or_else(|| "Keine gültige Audiospur gefunden.".to_string())?;
+        .ok_or_else(|| "No valid audio track found.".to_string())?;
 
     let track_id = track.id;
     let track_sample_rate = track.codec_params.sample_rate;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
-        .map_err(|e| format!("Audio-Decoder konnte nicht initialisiert werden: {}", e))?;
+        .map_err(|e| format!("Failed to initialize audio decoder: {}", e))?;
 
     let mut mono_samples = Vec::new();
     let mut decoded_sample_rate = track_sample_rate;
@@ -159,9 +167,9 @@ fn decode_audio_file_to_mono(path: &Path) -> Result<Vec<f32>, String> {
             Ok(packet) => packet,
             Err(SymphoniaError::IoError(_)) => break,
             Err(SymphoniaError::ResetRequired) => {
-                return Err("Audio-Stream benötigt einen Decoder-Reset.".to_string());
+                return Err("Audio stream requires decoder reset.".to_string());
             }
-            Err(e) => return Err(format!("Fehler beim Lesen des Audio-Streams: {}", e)),
+            Err(e) => return Err(format!("Failed to read audio stream: {}", e)),
         };
 
         if packet.track_id() != track_id {
@@ -171,7 +179,7 @@ fn decode_audio_file_to_mono(path: &Path) -> Result<Vec<f32>, String> {
         let decoded = match decoder.decode(&packet) {
             Ok(decoded) => decoded,
             Err(SymphoniaError::DecodeError(_)) => continue,
-            Err(e) => return Err(format!("Audio konnte nicht dekodiert werden: {}", e)),
+            Err(e) => return Err(format!("Failed to decode audio: {}", e)),
         };
 
         let spec = *decoded.spec();
@@ -194,8 +202,8 @@ fn decode_audio_file_to_mono(path: &Path) -> Result<Vec<f32>, String> {
         return Ok(Vec::new());
     }
 
-    let source_sample_rate = decoded_sample_rate
-        .ok_or_else(|| "Sample-Rate der Datei konnte nicht bestimmt werden.".to_string())?;
+    let source_sample_rate =
+        decoded_sample_rate.ok_or_else(|| "Unable to determine file sample rate.".to_string())?;
 
     resample_to_target_rate(&mono_samples, source_sample_rate, TARGET_SAMPLE_RATE)
 }
@@ -209,6 +217,7 @@ fn resample_to_target_rate(
         return Ok(samples.to_vec());
     }
 
+    // Chosen as a balance between throughput and memory usage for long uploads.
     const RESAMPLE_CHUNK_SIZE: usize = 2048;
 
     let mut resampler = FftFixedIn::<f32>::new(
@@ -218,7 +227,7 @@ fn resample_to_target_rate(
         1,
         1,
     )
-    .map_err(|e| format!("Resampler konnte nicht initialisiert werden: {}", e))?;
+    .map_err(|e| format!("Failed to initialize resampler: {}", e))?;
 
     let mut output = Vec::new();
     let mut offset = 0;
@@ -227,19 +236,20 @@ fn resample_to_target_rate(
         let end = (offset + RESAMPLE_CHUNK_SIZE).min(samples.len());
         let mut chunk = samples[offset..end].to_vec();
         if chunk.len() < RESAMPLE_CHUNK_SIZE {
+            // Final chunk is zero-padded because FftFixedIn operates on a fixed input length.
             chunk.resize(RESAMPLE_CHUNK_SIZE, 0.0);
         }
 
         let resampled_chunk = resampler
             .process(&[&chunk], None)
-            .map_err(|e| format!("Resampling fehlgeschlagen: {}", e))?;
+            .map_err(|e| format!("Resampling failed: {}", e))?;
 
         output.extend_from_slice(&resampled_chunk[0]);
         offset = end;
     }
 
     if output.is_empty() {
-        return Err("Resampling ergab keine Audio-Daten.".to_string());
+        return Err("Resampling returned no audio samples.".to_string());
     }
 
     let expected_len = ((samples.len() as f64 * target_sample_rate as f64)
@@ -248,6 +258,26 @@ fn resample_to_target_rate(
     output.truncate(expected_len.max(1));
 
     Ok(output)
+}
+
+fn sanitize_file_stem(file_stem: &str) -> String {
+    let sanitized: String = file_stem
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect();
+
+    let compact = sanitized.trim_matches('-');
+    if compact.is_empty() {
+        "audio".to_string()
+    } else {
+        compact.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -272,5 +302,14 @@ mod tests {
         let result = resample_to_target_rate(&samples, TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE)
             .expect("resampling should succeed");
         assert_eq!(samples, result);
+    }
+
+    #[test]
+    fn sanitize_file_stem_replaces_unsafe_characters() {
+        assert_eq!(
+            sanitize_file_stem("hello world?.mp3"),
+            "hello-world--mp3".to_string()
+        );
+        assert_eq!(sanitize_file_stem(""), "audio".to_string());
     }
 }
