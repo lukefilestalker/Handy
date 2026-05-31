@@ -14,8 +14,22 @@
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "history": "History",
+    "fileUpload": "File Upload",
     "debug": "Debug",
     "about": "About"
+  },
+  "fileUpload": {
+    "title": "File Upload Transcription",
+    "description": "Select an audio file (MP3, MP4, M4A, WAV, FLAC, OGG) to transcribe.",
+    "chooseFile": "Choose File",
+    "transcribing": "Transcribing...",
+    "selectedFile": "Selected File",
+    "progress": "Progress",
+    "resultTitle": "Transcription Result",
+    "copyResult": "Copy Result",
+    "copySuccess": "Transcription copied to clipboard.",
+    "copyError": "Failed to copy transcription.",
+    "transcribeError": "The file could not be transcribed."
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
